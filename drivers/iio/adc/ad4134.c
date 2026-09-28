@@ -381,24 +381,24 @@ static int ad4134_clock_select(struct ad4134_state *st)
 
 	/*
 	 * AD4134 requires one external clock source and only one external clock
-	 * source can be provided at a time. Try to get a crystal provided clock.
-	 * If that fails, try to get a CMOS clock.
+	 * source can be provided at a time. Try to get a crystal provided clock
+	 * and a CMOS clock, then make sure exactly one of them is present.
 	 */
 	xtal_clk = devm_clk_get_optional_enabled(dev, "xtal");
-	if (!xtal_clk)
-		xtal_clk = devm_clk_get_optional_enabled(dev, "xtal");
 	if (IS_ERR(xtal_clk))
 		return dev_err_probe(dev, PTR_ERR(xtal_clk),
 				     "failed to get xtal\n");
 
 	clkin_clk = devm_clk_get_optional_enabled(dev, "clkin");
-	if (!clkin_clk)
-		clkin_clk = devm_clk_get_optional_enabled(dev, "clkin");
 	if (IS_ERR(clkin_clk))
 		return dev_err_probe(dev, PTR_ERR(clkin_clk),
 				     "failed to get clkin\n");
 
-	st->sys_clk_hz = clk_get_rate(xtal_clk) | clk_get_rate(clkin_clk);
+	if (!xtal_clk == !clkin_clk)
+		return dev_err_probe(dev, -EINVAL,
+				     "exactly one of xtal or clkin clocks is required\n");
+
+	st->sys_clk_hz = clk_get_rate(xtal_clk ?: clkin_clk);
 	if (st->sys_clk_hz != AD4134_EXT_CLOCK_MHZ)
 		dev_warn(dev, "invalid external clock frequency %lu\n",
 			 st->sys_clk_hz);
